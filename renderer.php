@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * lw_courses block rendrer
+ * my_courses block rendrer
  *
- * @package    block_lw_courses
+ * @package    block_my_courses
  * @copyright  2012 Adam Olley <adam.olley@netspot.com.au>
  * @copyright  2017 Mathew May <mathewm@hotmail.co.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -25,26 +25,27 @@
 defined('MOODLE_INTERNAL') || die;
 
 /**
- * lw_courses block rendrer
+ * my_courses block rendrer
  *
  * @copyright  2012 Adam Olley <adam.olley@netspot.com.au>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class block_lw_courses_renderer extends plugin_renderer_base {
+class block_my_courses_renderer extends plugin_renderer_base {
 
     /**
-     * Construct contents of lw_courses block
+     * Construct contents of my_courses block
      *
      * @param array $courses list of courses in sorted order
-     * @return string html to be displayed in lw_courses block
+     * @param array $overviews list of my coursess
+     * @return string html to be displayed in my_courses block
      */
-    public function lw_courses($courses) {
+    public function my_courses($courses, $overviews) {
         global $CFG, $PAGE;
         $html = '';
         // LearningWorks.
-        $PAGE->requires->js(new moodle_url($CFG->wwwroot.'/blocks/lw_courses/js/custom.js'));
-        $config = get_config('block_lw_courses');
-        if ($config->showcategories != BLOCKS_LW_COURSES_SHOWCATEGORIES_NONE) {
+        $PAGE->requires->js(new moodle_url($CFG->wwwroot.'/blocks/my_courses/js/custom.js'));
+        $config = get_config('block_my_courses');
+        if ($config->showcategories != BLOCKS_MY_COURSES_SHOWCATEGORIES_NONE) {
             global $CFG;
             require_once($CFG->libdir.'/coursecatlib.php');
         }
@@ -54,7 +55,7 @@ class block_lw_courses_renderer extends plugin_renderer_base {
         // Intialise string/icon etc if user is editing and courses > 1.
         if ($this->page->user_is_editing() && (count($courses) > 1)) {
             $userediting = true;
-            $this->page->requires->js_init_call('M.block_lw_courses.add_handles');
+            $this->page->requires->js_init_call('M.block_my_courses.add_handles');
 
             // Check if course is moving.
             $ismovingcourse = optional_param('movecourse', false, PARAM_BOOL);
@@ -71,22 +72,15 @@ class block_lw_courses_renderer extends plugin_renderer_base {
             $a = new stdClass();
             $a->fullname = $courses[$movingcourseid]->fullname;
             $a->cancellink = html_writer::link($this->page->url, get_string('cancel'));
-            $html .= get_string('movingcourse', 'block_lw_courses', $a);
+            $html .= get_string('movingcourse', 'block_my_courses', $a);
             $html .= $this->output->box_end();
 
-            $moveurl = new moodle_url('/blocks/lw_courses/move.php',
+            $moveurl = new moodle_url('/blocks/my_courses/move.php',
                 array('sesskey' => sesskey(), 'moveto' => 0, 'courseid' => $movingcourseid));
-            if (method_exists($this->output, 'image_url')) {
-                // Use the new method.
-                $moveicon = $this->output->image_url('movehere');
-            } else {
-                // Still a pre Moodle 3.3 release. Use pix_url because image_url doesn't exist yet.
-                $moveicon = $this->output->pix_url('movehere');
-            }
             // Create move icon, so it can be used.
             $movetofirsticon = html_writer::empty_tag('img',
-                array('src' => $moveicon,
-                    'alt' => get_string('movetofirst', 'block_lw_courses', $courses[$movingcourseid]->fullname),
+                array('src' => $this->output->pix_url('movehere'),
+                    'alt' => get_string('movetofirst', 'block_my_courses', $courses[$movingcourseid]->fullname),
                     'title' => get_string('movehere')));
             $moveurl = html_writer::link($moveurl, $movetofirsticon);
             $html .= html_writer::tag('div', $moveurl, array('class' => 'movehere'));
@@ -96,12 +90,12 @@ class block_lw_courses_renderer extends plugin_renderer_base {
         $gridsplit = intval(12 / count($courses)); // Added intval to avoid any float.
 
         // Set a minimum size for the course 'cards'.
-        $colsize = intval($config->coursegridwidth) > 0 ? intval($config->coursegridwidth) : BLOCKS_LW_COURSES_DEFAULT_COL_SIZE;
+        $colsize = intval($config->coursegridwidth) > 0 ? intval($config->coursegridwidth) : BLOCKS_MY_COURSES_DEFAULT_COL_SIZE;
         if ($gridsplit < $colsize) {
             $gridsplit = $colsize;
         }
 
-        $courseclass = $config->startgrid == BLOCKS_LW_COURSES_STARTGRID_YES ? "grid" : "list";
+        $courseclass = $config->startgrid == BLOCKS_MY_COURSES_STARTGRID_YES ? "grid" : "list";
         $startvalue = $courseclass == "list" ? "12" : $gridsplit;
 
         $listonly = false;
@@ -116,7 +110,7 @@ class block_lw_courses_renderer extends plugin_renderer_base {
         $html .= html_writer::tag('div', '', array("class" => "hidden startgrid $courseclass", "grid-size" => $gridsplit));
         $html .= html_writer::div('', 'box flush');
 
-        $html .= html_writer::start_div('lw_courses_list');
+        $html .= html_writer::start_div('my_courses_list');
         foreach ($courses as $key => $course) {
             // If moving course, then don't show course which needs to be moved.
             if ($ismovingcourse && ($course->id == $movingcourseid)) {
@@ -127,22 +121,14 @@ class block_lw_courses_renderer extends plugin_renderer_base {
                 "coursebox $courseclass span$startvalue col-md-$startvalue $courseclass col-xs-12",
                 "course-{$course->id}");
             $html .= $this->course_image($course);
+            $html .= build_progress($course);
 
-            $html .= block_lw_courses_build_progress($course);
-
-            if (method_exists($this->output, 'image_url')) {
-                // Use the new method.
-                $moveicon = $this->image_url('t/move');
-            } else {
-                // Still a pre Moodle 3.3 release. Use pix_url because image_url doesn't exist yet.
-                $moveicon = $this->pix_url('t/move');
-            }
             $html .= html_writer::start_tag('div', array('class' => 'course_title'));
             // If user is editing, then add move icons.
             if ($userediting && !$ismovingcourse) {
                 $moveicon = html_writer::empty_tag('img',
-                    array('src' => $moveicon->out(false),
-                        'alt' => get_string('movecourse', 'block_lw_courses', $course->fullname),
+                    array('src' => $this->pix_url('t/move')->out(false),
+                        'alt' => get_string('movecourse', 'block_my_courses', $course->fullname),
                         'title' => get_string('move')));
                 $moveurl = new moodle_url($this->page->url, array('sesskey' => sesskey(), 'movecourse' => 1,
                     'courseid' => $course->id));
@@ -173,19 +159,24 @@ class block_lw_courses_renderer extends plugin_renderer_base {
 
             if (!empty($config->showchildren) && ($course->id > 0)) {
                 // List children here.
-                if ($children = block_lw_courses_get_child_shortnames($course->id)) {
+                if ($children = block_my_courses_get_child_shortnames($course->id)) {
                     $html .= html_writer::tag('span', $children, array('class' => 'coursechildren'));
                 }
             }
 
+            // If user is moving courses, then down't show overview.
+            if (isset($overviews[$course->id]) && !$ismovingcourse) {
+                $html .= $this->activity_display($course->id, $overviews[$course->id]);
+            }
+
             $html .= $this->course_description($course);
 
-            if ($config->showcategories != BLOCKS_LW_COURSES_SHOWCATEGORIES_NONE) {
+            if ($config->showcategories != BLOCKS_MY_COURSES_SHOWCATEGORIES_NONE) {
                 // List category parent or categories path here.
                 $currentcategory = coursecat::get($course->category, IGNORE_MISSING);
                 if ($currentcategory !== null) {
                     $html .= html_writer::start_tag('div', array('class' => 'categorypath'));
-                    if ($config->showcategories == BLOCKS_LW_COURSES_SHOWCATEGORIES_FULL_PATH) {
+                    if ($config->showcategories == BLOCKS_MY_COURSES_SHOWCATEGORIES_FULL_PATH) {
                         foreach ($currentcategory->get_parents() as $categoryid) {
                             $category = coursecat::get($categoryid, IGNORE_MISSING);
                             if ($category !== null) {
@@ -201,22 +192,15 @@ class block_lw_courses_renderer extends plugin_renderer_base {
             $html .= $this->output->box('', 'flush');
             $html .= $this->output->box_end();
             $courseordernumber++;
-            if (method_exists($this->output, 'image_url')) {
-                // Use the new method.
-                $movehere = $this->output->image_url('movehere');
-            } else {
-                // Still a pre Moodle 3.3 release. Use pix_url because image_url doesn't exist yet.
-                $movehere = $this->output->pix_url('movehere');
-            }
             if ($ismovingcourse) {
-                $moveurl = new moodle_url('/blocks/lw_courses/move.php',
+                $moveurl = new moodle_url('/blocks/my_courses/move.php',
                     array('sesskey' => sesskey(), 'moveto' => $courseordernumber, 'courseid' => $movingcourseid));
                 $a = new stdClass();
                 $a->movingcoursename = $courses[$movingcourseid]->fullname;
                 $a->currentcoursename = $course->fullname;
                 $movehereicon = html_writer::empty_tag('img',
-                    array('src' => $movehere,
-                        'alt' => get_string('moveafterhere', 'block_lw_courses', $a),
+                    array('src' => $this->output->pix_url('movehere'),
+                        'alt' => get_string('moveafterhere', 'block_my_courses', $a),
                         'title' => get_string('movehere')));
                 $moveurl = html_writer::link($moveurl, $movehereicon);
                 $html .= html_writer::tag('div', $moveurl, array('class' => 'movehere'));
@@ -247,7 +231,7 @@ class block_lw_courses_renderer extends plugin_renderer_base {
             if (get_string_manager()->string_exists("activityoverview", $module)) {
                 $icontext .= get_string("activityoverview", $module);
             } else {
-                $icontext .= get_string("activityoverview", 'block_lw_courses', $modulename);
+                $icontext .= get_string("activityoverview", 'block_my_courses', $modulename);
             }
 
             // Add collapsible region with overview text in it.
@@ -268,13 +252,13 @@ class block_lw_courses_renderer extends plugin_renderer_base {
     public function editing_bar_head($max = 0) {
         $output = $this->output->box_start('notice');
 
-        $options = array('0' => get_string('alwaysshowall', 'block_lw_courses'));
+        $options = array('0' => get_string('alwaysshowall', 'block_my_courses'));
         for ($i = 1; $i <= $max; $i++) {
             $options[$i] = $i;
         }
         $url = new moodle_url('/my/index.php');
-        $select = new single_select($url, 'mynumber', $options, block_lw_courses_get_max_user_courses(), array());
-        $select->set_label(get_string('numtodisplay', 'block_lw_courses'));
+        $select = new single_select($url, 'mynumber', $options, block_my_courses_get_max_user_courses(), array());
+        $select->set_label(get_string('numtodisplay', 'block_my_courses'));
         $output .= $this->output->render($select);
 
         $output .= $this->output->box_end();
@@ -293,17 +277,17 @@ class block_lw_courses_renderer extends plugin_renderer_base {
         }
         $output = $this->output->box_start('notice');
         $plural = $total > 1 ? 'plural' : '';
-        $config = get_config('block_lw_courses');
+        $config = get_config('block_my_courses');
         // Show view all course link to user if forcedefaultmaxcourses is not empty.
         if (!empty($config->forcedefaultmaxcourses)) {
-            $output .= get_string('hiddencoursecount'.$plural, 'block_lw_courses', $total);
+            $output .= get_string('hiddencoursecount'.$plural, 'block_my_courses', $total);
         } else {
             $a = new stdClass();
             $a->coursecount = $total;
             $a->showalllink = html_writer::link(new moodle_url('/my/index.php',
-                array('mynumber' => block_lw_courses::SHOW_ALL_COURSES)),
+                array('mynumber' => block_my_courses::SHOW_ALL_COURSES)),
                 get_string('showallcourses'));
-            $output .= get_string('hiddencoursecountwithshowall'.$plural, 'block_lw_courses', $a);
+            $output .= get_string('hiddencoursecountwithshowall'.$plural, 'block_my_courses', $a);
         }
 
         $output .= $this->output->box_end();
@@ -363,7 +347,7 @@ class block_lw_courses_renderer extends plugin_renderer_base {
         $output .= '<div id="' . $id . '_caption" class="collapsibleregioncaption">';
         $output .= $caption . ' ';
         $output .= '</div><div id="' . $id . '_inner" class="collapsibleregioninner">';
-        $this->page->requires->js_init_call('M.block_lw_courses.collapsible', array($id, $userpref, get_string('clicktohideshow')));
+        $this->page->requires->js_init_call('M.block_my_courses.collapsible', array($id, $userpref, get_string('clicktohideshow')));
 
         return $output;
     }
@@ -392,20 +376,20 @@ class block_lw_courses_renderer extends plugin_renderer_base {
         $output .= html_writer::tag('div', $picture, array('class' => 'profilepicture'));
 
         $output .= $this->output->box_start('welcome_message');
-        $output .= $this->output->heading(get_string('welcome', 'block_lw_courses', $USER->firstname));
+        $output .= $this->output->heading(get_string('welcome', 'block_my_courses', $USER->firstname));
 
         if (!empty($CFG->messaging)) {
             $plural = 's';
             if ($msgcount > 0) {
-                $output .= get_string('youhavemessages', 'block_lw_courses', $msgcount);
+                $output .= get_string('youhavemessages', 'block_my_courses', $msgcount);
                 if ($msgcount == 1) {
                     $plural = '';
                 }
             } else {
-                $output .= get_string('youhavenomessages', 'block_lw_courses');
+                $output .= get_string('youhavenomessages', 'block_my_courses');
             }
             $output .= html_writer::link(new moodle_url('/message/index.php'),
-                get_string('message'.$plural, 'block_lw_courses'));
+                get_string('message'.$plural, 'block_my_courses'));
         }
         $output .= $this->output->box_end();
         $output .= $this->output->box('', 'flush');
@@ -427,17 +411,18 @@ class block_lw_courses_renderer extends plugin_renderer_base {
 
         require_once($CFG->libdir.'/coursecatlib.php');
         $course = new course_in_list($course);
+
         // Check to see if a file has been set on the course level.
-        if ($course->id > 0 && $course->get_course_overviewfiles()) {
+        if ($course->get_course_overviewfiles()) {
             foreach ($course->get_course_overviewfiles() as $file) {
                 $isimage = $file->is_valid_image();
                 $url = file_encode_url("$CFG->wwwroot/pluginfile.php",
                     '/'. $file->get_contextid(). '/'. $file->get_component(). '/'.
                     $file->get_filearea(). $file->get_filepath(). $file->get_filename(), !$isimage);
                 if ($isimage) {
-                    $config = get_config('block_lw_courses');
-                    if (is_null($config->lw_courses_bgimage) ||
-                         $config->lw_courses_bgimage == BLOCKS_LW_COURSES_IMAGEASBACKGROUND_FALSE) {
+                    $config = get_config('block_my_courses');
+                    if (is_null($config->my_courses_bgimage) ||
+                         $config->my_courses_bgimage == BLOCKS_MY_COURSES_IMAGEASBACKGROUND_FALSE) {
                         // Embed the image url as a img tag sweet...
                         $image = html_writer::empty_tag('img', array('src' => $url, 'class' => 'course_image'));
                         return html_writer::div($image, 'image_wrap');
@@ -466,26 +451,18 @@ class block_lw_courses_renderer extends plugin_renderer_base {
     public function course_image_defaults() {
         global $OUTPUT;
 
-        $config = get_config('block_lw_courses');
+        $config = get_config('block_my_courses');
 
-        if (method_exists($this->output, 'image_url')) {
-            // Use the new method.
-            $default = $this->output->image_url('default', 'block_lw_courses');
-        } else {
-            // Still a pre Moodle 3.3 release. Use pix_url because image_url doesn't exist yet.
-            $default = $this->output->pix_url('default', 'block_lw_courses');
-        }
-        if ($courseimagedefault = get_config('block_lw_courses', 'courseimagedefault')) {
-
+        if ($courseimagedefault = get_config('block_my_courses', 'courseimagedefault')) {
             // Return an img element with the image in the block settings to use for the course.
-            $imageurl = block_lw_courses_get_course_image_url($courseimagedefault);
+            $imageurl = block_my_courses_get_course_image_url($courseimagedefault);
         } else {
-            // We check for a default image in the lw_courses pix folder named default aka our final hope.
-            $imageurl = $default;
+            // We check for a default image in the my_courses pix folder named default aka our final hope.
+            $imageurl = $OUTPUT->pix_url('default', 'block_my_courses');
         }
 
         // Do we need a CSS soloution or is a img good enough?.
-        if (is_null($config->lw_courses_bgimage) || $config->lw_courses_bgimage == BLOCKS_LW_COURSES_IMAGEASBACKGROUND_FALSE) {
+        if (is_null($config->my_courses_bgimage) || $config->my_courses_bgimage == BLOCKS_MY_COURSES_IMAGEASBACKGROUND_FALSE) {
             // Embed the image url as a img tag sweet...
             $image = html_writer::empty_tag('img', array( 'src' => $imageurl, 'class' => 'course_image' ));
             return html_writer::div($image, 'image_wrap');
@@ -505,14 +482,13 @@ class block_lw_courses_renderer extends plugin_renderer_base {
      * @return string|void
      */
     public function course_description($course) {
-        global $CFG;
-        require_once($CFG->libdir.'/coursecatlib.php');
+
         $course = new course_in_list($course); // Todo : why does this fix so many issues?.
         if ($course->has_summary()) {
             $context = context_course::instance($course->id);
-            if (intval(get_config('block_lw_courses', 'summary_limit')) > 0) {
+            if (intval(get_config('block_my_courses', 'summary_limit')) > 0) {
                 $summaryexcerpt = $this->truncate_html($course->summary,
-                    intval(get_config('block_lw_courses', 'summary_limit')));
+                    intval(get_config('block_my_courses', 'summary_limit')));
             } else {
                 $summaryexcerpt = $course->summary;
             }
